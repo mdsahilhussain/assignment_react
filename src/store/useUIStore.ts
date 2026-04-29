@@ -1,29 +1,62 @@
 import { create } from "zustand";
+import { devtools } from "zustand/middleware";
 import type { Category } from "../types/product";
 
-type SortBy = "price" | "rating";
-type SortOrder = "asc" | "desc";
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface UIState {
+export type SortField = "price" | "rating";
+export type SortOrder = "asc" | "desc";
+
+interface UIStoreState {
   search: string;
   filterCategory: Category | "All";
-  sortBy: SortBy;
+  sortField: SortField;
   sortOrder: SortOrder;
+  currentPage: number;
 
   setSearch: (value: string) => void;
-  setFilterCategory: (category: Category | "All") => void;
-  setSortBy: (sortBy: SortBy) => void;
+  setFilterCategory: (value: Category | "All") => void;
+  setSortField: (field: SortField) => void;
+  toggleSortOrder: () => void;
   setSortOrder: (order: SortOrder) => void;
+  resetFilters: () => void;
+  setCurrentPage: (page: number) => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
-  search: "",
-  filterCategory: "All",
-  sortBy: "price",
-  sortOrder: "asc",
+// ─── Store ────────────────────────────────────────────────────────────────────
 
-  setSearch: (search) => set({ search }),
-  setFilterCategory: (filterCategory) => set({ filterCategory }),
-  setSortBy: (sortBy) => set({ sortBy }),
-  setSortOrder: (sortOrder) => set({ sortOrder })
-}));
+const DEFAULT_STATE = {
+  search: "",
+  currentPage: 1 as number,
+  filterCategory: "All" as const,
+  sortField: "rating" as SortField,
+  sortOrder: "desc" as SortOrder,
+};
+
+export const useUIStore = create<UIStoreState>()(
+  devtools(
+    (set) => ({
+      ...DEFAULT_STATE,
+
+      setSearch: (value) =>
+        set(() => ({
+          search: value,
+          currentPage: 1, // reset here
+        })),
+
+      setFilterCategory: (value) =>
+        set({ filterCategory: value, currentPage: 1 }),
+
+      setSortField: (field) => set({ sortField: field, currentPage: 1 }),
+
+      toggleSortOrder: () =>
+        set((s) => ({ sortOrder: s.sortOrder === "asc" ? "desc" : "asc" })),
+
+      setSortOrder: (order) => set({ sortOrder: order }),
+      setCurrentPage: (page) => set({ currentPage: page }),
+
+      resetFilters: () => set(DEFAULT_STATE),
+    }),
+    { name: "UIStore" }
+  )
+);
