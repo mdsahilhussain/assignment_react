@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+Project Overview
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This project is a frontend application that manages a product list with advanced state handling, including optimistic updates, undo/redo functionality, and background data synchronization.
 
-Currently, two official plugins are available:
+The focus of this implementation is not just UI, but handling real-world complexities like async operations, race conditions, and state consistency.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Key Features
+- Product table with search, filter, and sorting
+- Inline category editing with optimistic updates
+- Undo / Redo using patch-based history
+- Simulated API with delay and failure handling
+- Background data updates (price & rating)
+- Conflict resolution between user actions and server updates
 
-## React Compiler
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Architecture Decisions
 
-## Expanding the ESLint configuration
+### State Management
+Used Zustand for:
+- Lightweight global state
+- Fine-grained subscriptions
+- Better control over async + history logic
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Data Flow
+Server State (products) --> Derived State (filter/search/sort) --> UI
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Optimistic Updates
+- UI updates immediately
+- API call happens in background
+- On failure → rollback
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Undo / Redo Strategy
+- Implemented using patch-based history
+- Stores only category changes
+- Efficient and memory-friendly
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+
+### Race Condition Handling
+- Each update uses a requestId
+- Only latest response is applied
+- Prevents stale updates overriding new ones
+
+
+### Background Sync
+- Polling every 5 seconds
+- Updates price & rating
+- Skips rows under user interaction
+
+
+### Tech Stack
+- React + TypeScript
+- Zustand (state management)
+- Tailwind CSS
+
+### How to Run
+npm install
+npm run dev
