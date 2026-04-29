@@ -1,192 +1,133 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { create } from "zustand";
-import { generateProducts } from "../utils/mockData";
-import type { Category, Product } from "../types/product";
-import type { CategoryPatch } from "../types/history";
+import { create } from 'zustand'
+import { devtools } from 'zustand/middleware'
+import { MOCK_PRODUCTS, hydrateProducts } from '../utils/mockData'
+import { updateProductCategory } from '../services/productApi'
+import type { HistoryEntry, ProductStoreState } from '../types/history'
+import type { RuntimeProduct } from '../types/product'
 
-interface ProductState {
-  products: Product[];
-
-  // undo / redo
-  past: CategoryPatch[];
-  future: CategoryPatch[];
-
-  // actions
-  loadProducts: () => void;
-
-  updateCategoryOptimistic: (
-    productId: number,
-    newCategory: Category
-  ) => number; // returns requestId
-
-  confirmCategoryUpdate: (productId: number, requestId: number) => void;
-
-  rollbackCategoryUpdate: (productId: number, requestId: number) => void;
-
-  undo: () => void;
-  redo: () => void;
-
-  applyBackgroundUpdate: (updates: Partial<Product>[]) => void;
+//  Helpers 
+function updateProduct(
+  products: RuntimeProduct[],
+  productId: number,
+  patch: Partial<RuntimeProduct>
+): RuntimeProduct[] {
+  return products.map((p) => (p.id === productId ? { ...p, ...patch } : p))
 }
 
-let requestCounter = 0;
+//  Store 
+export const useProductStore = create<ProductStoreState>()(
+  devtools(
+    (set, get) => ({
+      products: hydrateProducts(MOCK_PRODUCTS),
+      past: [],
+      future: [],
+      canUndo: false,
+      canRedo: false,
 
-export const useProductStore = create<ProductState>((set, get) => ({
-  products: [],
-  past: [],
-  future: [],
+      editCategory: async (productId, newCategory) => {
+        const { products, past } = get()
+        const product = products.find((p) => p.id === productId)
+        if (!product || product._lockedByUser) return
 
-  // load initial data
-  loadProducts: () => {
-    const data = generateProducts(20);
-    set({ products: data });
-  },
+        const previousCategory = product.category
 
-  // OPTIMISTIC UPDATE
-  updateCategoryOptimistic: (productId, newCategory) => {
-    const requestId = ++requestCounter;
+        // Optimistic update — lock the row and show new value immediately
+        set((s) => ({
+          products: updateProduct(s.products, productId, {
+            _status: 'saving',
+            _optimisticCategory: newCategory,
+            _lockedByUser: true,
+            _error: null,
+          }),
+        }))
 
-    set((state: any) => {
-      const products = state.products.map((p: Product) => {
-        if (p.id !== productId) return p;
+        try {
+          await updateProductCategory(productId, newCategory)
 
-        const currentCategory = p._optimisticCategory ?? p.category;
+          // Commit — apply real value, push to history, clear optimistic state
+          const entry: HistoryEntry = {
+            productId,
+            from: previousCategory,
+            to: newCategory,
+          }
 
-        return {
-          ...p,
-          _prevCategory: currentCategory,   // store previous for rollback
-          _optimisticCategory: newCategory,
-          _status: "saving",
-          _locked: true,
-          _requestId: requestId,
-        };
-      });
+          set((s) => ({
+            products: updateProduct(s.products, productId, {
+              category: newCategory,
+              _status: 'idle',
+              _optimisticCategory: null,
+              _lockedByUser: false,
+              _error: null,
+            }),
+            past: [...past, entry],
+            future: [],
+            canUndo: true,
+            canRedo: false,
+          }))
+        } catch (err) {
+          // Rollback — restore previous category, surface error
+          set((s) => ({
+            products: updateProduct(s.products, productId, {
+              category: previousCategory,
+              _status: 'error',
+              _optimisticCategory: null,
+              _lockedByUser: false,
+              _error: err instanceof Error ? err.message : 'Unknown error',
+            }),
+          }))
+        }
+      },
 
-      return { products };
-    });
+      applyBackgroundUpdates: (updates) => {
+        set((s) => ({
+          products: s.products.map((p) => {
+            const update = updates.find((u) => u.id === p.id)
+            if (!update || p._lockedByUser) return p
+            return {
+              ...p,
+              price: update.price,
+              rating: update.rating,
+            }
+          }),
+        }))
+      },
 
-    return requestId;
-  },
+      undo: () => {
+        const { past, future, products } = get()
+        if (past.length === 0) return
 
-  // SUCCESS
-  confirmCategoryUpdate: (productId, requestId) => {
-    set((state: any) => {
-    let newPatch: CategoryPatch | null = null;
-      const products = state.products.map((p: Product) => {
-        if (p.id !== productId) return p;
+        const entry = past[past.length - 1]
+        const newPast = past.slice(0, -1)
 
-        // ignore stale response
-        if (p._requestId !== requestId) return p;
+        set({
+          products: updateProduct(products, entry.productId, {
+            category: entry.from,
+          }),
+          past: newPast,
+          future: [entry, ...future],
+          canUndo: newPast.length > 0,
+          canRedo: true,
+        })
+      },
 
-        const finalCategory = p._optimisticCategory ?? p.category;
+      redo: () => {
+        const { past, future, products } = get()
+        if (future.length === 0) return
 
-        // push to history
-         newPatch = {
-          productId,
-          from: p.category,
-          to: finalCategory,
-        };
+        const entry = future[0]
+        const newFuture = future.slice(1)
 
-        return {
-          ...p,
-          category: finalCategory,
-          _optimisticCategory: undefined,
-          _prevCategory: undefined,
-          _status: "idle",
-          _locked: false,
-          _requestId: undefined,
-        };
-      });
-
-      return {
-        products,
-        // past: [
-        //   ...state.past,
-        //   ...products
-        //     .filter((p: { _requestId: number }) => p._requestId === requestId)
-        //     .map((p: { id: any; category: any; _optimisticCategory: any }) => ({
-        //       productId: p.id,
-        //       from: p.category,
-        //       to: p._optimisticCategory ?? p.category,
-        //     })),
-        // ],
-        past: newPatch ? [...state.past, newPatch] : state.past,
-        future: [],
-      };
-    });
-  },
-
-  // FAILURE → ROLLBACK
-  rollbackCategoryUpdate: (productId, requestId) => {
-    set((state: any) => {
-      const products = state.products.map((p: Product) => {
-        if (p.id !== productId) return p;
-
-        if (p._requestId !== requestId) return p;
-
-        return {
-          ...p,
-          _optimisticCategory: undefined,
-          _status: "error",
-          _locked: false,
-          _requestId: undefined,
-        };
-      });
-
-      return { products };
-    });
-  },
-
-  // UNDO
-  undo: () => {
-    const { past, products } = get();
-    if (past.length === 0) return;
-
-    const last = past[past.length - 1];
-
-    set({
-      products: products.map((p) =>
-        p.id === last.productId ? { ...p, category: last.from } : p
-      ),
-      past: past.slice(0, -1),
-      future: [last, ...get().future],
-    });
-  },
-
-  // REDO
-  redo: () => {
-    const { future, products } = get();
-    if (future.length === 0) return;
-
-    const next = future[0];
-
-    set({
-      products: products.map((p) =>
-        p.id === next.productId ? { ...p, category: next.to } : p
-      ),
-      future: future.slice(1),
-      past: [...get().past, next],
-    });
-  },
-
-  // BACKGROUND UPDATE
-  applyBackgroundUpdate: (updates) => {
-    set((state) => {
-      const products = state.products.map((p) => {
-        const update = updates.find((u) => u.id === p.id);
-        if (!update) return p;
-
-        // skip locked rows
-        if (p._locked) return p;
-
-        return {
-          ...p,
-          price: update.price ?? p.price,
-          rating: update.rating ?? p.rating,
-        };
-      });
-
-      return { products };
-    });
-  },
-}));
+        set({
+          products: updateProduct(products, entry.productId, {
+            category: entry.to,
+          }),
+          past: [...past, entry],
+          future: newFuture,
+          canUndo: true,
+          canRedo: newFuture.length > 0,
+        })
+      },
+    }),
+    { name: 'ProductStore' }
+  )
+)
