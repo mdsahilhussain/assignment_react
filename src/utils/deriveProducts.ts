@@ -1,42 +1,31 @@
-import type { Product } from "../types/product";
+import type { RuntimeProduct, Category } from './mockData'
+import type { SortField, SortOrder } from '../store/useUIStore'
 
-interface DeriveOptions {
-  search: string;
-  filterCategory: string;
-  sortBy: "price" | "rating";
-  sortOrder: "asc" | "desc";
+export interface DeriveOptions {
+  search: string
+  filterCategory: Category | 'All'
+  sortField: SortField
+  sortOrder: SortOrder
 }
 
-export const deriveProducts = (
-  products: Product[],
+export function deriveProducts(
+  products: RuntimeProduct[],
   options: DeriveOptions
-): Product[] => {
-  let result = [...products];
+): RuntimeProduct[] {
+  const { search, filterCategory, sortField, sortOrder } = options
 
-  // FILTER
-  if (options.filterCategory !== "All") {
-    result = result.filter(
-      (p) => (p._optimisticCategory ?? p.category) === options.filterCategory
-    );
-  }
+  const query = search.trim().toLowerCase()
 
-  // SEARCH
-  if (options.search.trim()) {
-    const search = options.search.toLowerCase();
-    result = result.filter((p) => p.title.toLowerCase().includes(search));
-  }
+  const filtered = products.filter((p) => {
+    const matchesSearch = query === '' || p.title.toLowerCase().includes(query)
+    const matchesCategory =
+      filterCategory === 'All' || p.category === filterCategory
+    return matchesSearch && matchesCategory
+  })
 
-  // SORT
-  result.sort((a, b) => {
-    const valueA = a[options.sortBy];
-    const valueB = b[options.sortBy];
-
-    if (options.sortOrder === "asc") {
-      return valueA - valueB;
-    } else {
-      return valueB - valueA;
-    }
-  });
-
-  return result;
-};
+  return [...filtered].sort((a, b) => {
+    const aVal = sortField === 'price' ? a.price : a.rating
+    const bVal = sortField === 'price' ? b.price : b.rating
+    return sortOrder === 'asc' ? aVal - bVal : bVal - aVal
+  })
+}

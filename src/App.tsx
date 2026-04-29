@@ -1,6 +1,9 @@
+import { useBackgroundSync } from './hooks/useBackgroundSync'
+import { ProductTable } from './components/ProductTable/ProductTable'
 
-export default function App() {
-  return (
-    <div>App</div>
-  )
+function App() {
+  useBackgroundSync()
+  return <ProductTable />
 }
+
+export default App
