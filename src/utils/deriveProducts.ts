@@ -1,5 +1,5 @@
-import type { RuntimeProduct, Category } from './mockData'
 import type { SortField, SortOrder } from '../store/useUIStore'
+import type { Category, RuntimeProduct } from '../types/product'
 
 export interface DeriveOptions {
   search: string

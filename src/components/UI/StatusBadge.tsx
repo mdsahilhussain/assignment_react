@@ -1,4 +1,4 @@
-import type { ProductStatus } from '../../utils/mockData'
+import type { ProductStatus } from "../../types/product";
 
 interface Props {
   status: ProductStatus

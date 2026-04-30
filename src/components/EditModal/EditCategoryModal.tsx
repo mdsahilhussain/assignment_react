@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CATEGORIES } from '../../utils/mockData'
-import type { Category, RuntimeProduct } from '../../utils/mockData'
+import type { Category, RuntimeProduct } from '../../types/product'
 
 interface Props {
   product: RuntimeProduct
