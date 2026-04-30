@@ -109,7 +109,7 @@ export function ProductTable() {
 
       {/* Table */}
       <section className="w-full mx-auto px-6 py-4">
-        <div className="border border-zinc-800 rounded-lg overflow-hidden">
+        <div className="border border-zinc-800 rounded-lg max-sm:overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-zinc-800 bg-zinc-900/60">
