@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { useProductStore } from '../store/useProductStore'
-import type { Category } from '../utils/mockData'
+import type { Category } from '../types/product'
 
 const DEBOUNCE_MS = 500
 
