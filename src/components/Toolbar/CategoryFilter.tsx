@@ -16,6 +16,7 @@ export function CategoryFilter() {
         text-zinc-200
         focus:outline-none focus:border-zinc-400
         transition-colors duration-150
+        max-sm:w-full
       "
     >
       <option value="All">All Categories</option>

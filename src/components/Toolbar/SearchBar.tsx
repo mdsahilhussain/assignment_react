@@ -6,7 +6,7 @@ export function SearchBar() {
   const setSearch = useUIStore((s) => s.setSearch)
 
   return (
-    <div className="relative">
+    <div className="relative max-sm:w-full">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
       <input
         type="text"
@@ -19,6 +19,7 @@ export function SearchBar() {
           text-zinc-200 placeholder-zinc-600
           focus:outline-none focus:border-zinc-400
           transition-colors duration-150
+          max-sm:w-full
         "
       />
       {search && (
